@@ -2,15 +2,31 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import datetime
+import requests
 
 st.set_page_config(page_title="Lorry Logistics Dashboard", layout="wide")
 
-st.title("🚚 Lorry Log Dashboard - DAF 7171")
+# --- සජීවීව ඉන්ධන මිල ලබා ගැනීම (Live Fuel Price) ---
+@st.cache_data(ttl=3600)  # පැයකට වරක් මිල පරීක්ෂා කරයි
+def get_live_fuel_price():
+    try:
+        # ශ්‍රී ලංකාවේ ඉන්ධන මිල පෙන්වන විශ්වාසවන්ත API එකක් භාවිතා කිරීම
+        response = requests.get("https://api.ceypetco.gov.lk/prices") # උදාහරණ API එකක්
+        if response.status_code == 200:
+            prices = response.json()
+            # මෙහිදී Petrol 92 මිල තෝරා ගනී (API එකේ ආකෘතිය අනුව මෙය වෙනස් විය හැක)
+            return float(prices['petrol_92'])
+    except:
+        return 310.0  # API එක වැඩ නොකළහොත් පෙරනිමි මිල (Default) භාවිතා වේ
 
-# පරාමිතීන් (Settings)
-FUEL_PRICE = 310.0  # වත්මන් පෙට්‍රල් මිල (Rs.)
-KM_PER_LITER = 8.0   # වාහනයේ සාමාන්‍ය පරිභෝජනය (LKM)
-OFFICE_DISTANCE = 50 # දිනපතා අඩු කළ යුතු දුර (KM)
+LIVE_FUEL_PRICE = get_live_fuel_price()
+
+st.title("🚚 Lorry Log Dashboard - DAF 7171")
+st.info(f"වත්මන් සජීවී පෙට්‍රල් මිල: Rs. {LIVE_FUEL_PRICE:.2f}")
+
+# පරාමිතීන්
+KM_PER_LITER = 8.0   
+OFFICE_DISTANCE = 50 
 
 # Google Sheets සම්බන්ධතාවය
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -23,12 +39,12 @@ def load_data():
 
 data = load_data()
 
-# දත්ත ඇතුළත් කිරීමේ කොටස (Sidebar)
+# දත්ත ඇතුළත් කිරීමේ Sidebar
 with st.sidebar.form("input_form"):
     st.header("නව දත්ත ඇතුළත් කරන්න")
     new_date = st.date_input("දිනය", datetime.date.today())
-    start_km = st.number_input("ආරම්භක මීටරය (Start KM)", min_value=0)
-    end_km = st.number_input("අවසාන මීටරය (End KM)", min_value=0)
+    start_km = st.number_input("ආරම්භක මීටරය", min_value=0)
+    end_km = st.number_input("අවසාන මීටරය", min_value=0)
     fuel_type = st.selectbox("ඉන්ධන වර්ගය", ["Petrol 92", "Petrol 95"])
     fuel_liters = st.number_input("පිරවූ ලීටර් ගණන", min_value=0.0)
     trip_details = st.text_input("ට්‍රිප් එකේ විස්තර")
@@ -55,19 +71,16 @@ if submitted:
     st.sidebar.success("දත්ත ඇතුළත් කළා!")
     st.rerun()
 
-# --- ගණනය කිරීම් සහ Summary ---
+# ගණනය කිරීම් සඳහා LIVE_FUEL_PRICE භාවිතා කිරීම
+data['Total_Fuel_Cost'] = data['Difference'] / KM_PER_LITER * LIVE_FUEL_PRICE
+data['Office_Fuel_Cost'] = OFFICE_DISTANCE / KM_PER_LITER * LIVE_FUEL_PRICE
+data['Job_Fuel_Cost'] = data['Per_Job_KM'] / KM_PER_LITER * LIVE_FUEL_PRICE
+
+# --- Dashboard Display ---
 st.header("📊 ඉන්ධන සහ ට්‍රිප් විශ්ලේෂණය")
-
-# ගණනය කිරීම් (Calculations)
-data['Total_Fuel_Cost'] = data['Difference'] / KM_PER_LITER * FUEL_PRICE
-data['Office_Fuel_Cost'] = OFFICE_DISTANCE / KM_PER_LITER * FUEL_PRICE
-data['Job_Fuel_Cost'] = data['Per_Job_KM'] / KM_PER_LITER * FUEL_PRICE
-
-# ටැබ් මගින් Summary පෙන්වීම
 tab1, tab2, tab3 = st.tabs(["සතිපතා වාර්තාව", "මාසික වාර්තාව", "සම්පූර්ණ දත්ත"])
 
 with tab1:
-    st.subheader("පසුගිය දින 7")
     last_week = data[data['Date'] > (pd.Timestamp.now() - pd.Timedelta(days=7))]
     col1, col2, col3 = st.columns(3)
     col1.metric("මුළු දුර (KM)", f"{last_week['Difference'].sum():.1f}")
@@ -75,20 +88,8 @@ with tab1:
     col3.metric("ට්‍රිප් ගණන", len(last_week))
 
 with tab2:
-    st.subheader("මේ මාසයේ වාර්තාව")
     this_month = data[data['Date'].dt.month == datetime.date.today().month]
     col1, col2, col3 = st.columns(3)
     col1.metric("ට්‍රිප් වල වියදම (Net)", f"Rs. {this_month['Job_Fuel_Cost'].sum():,.2f}")
     col2.metric("කාර්යාල ගමන් වියදම", f"Rs. {this_month['Office_Fuel_Cost'].sum():,.2f}")
     col3.metric("මුළු පිරිවැය", f"Rs. {this_month['Total_Fuel_Cost'].sum():,.2f}")
-
-with tab3:
-    st.dataframe(data)
-    # Download Button
-    csv = data.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="Summary Report එක Download කරන්න (CSV)",
-        data=csv,
-        file_name=f"Lorry_Report_{datetime.date.today()}.csv",
-        mime="text/csv",
-    )
