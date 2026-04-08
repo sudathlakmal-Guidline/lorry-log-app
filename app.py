@@ -4,15 +4,15 @@ import pandas as pd
 import datetime
 import plotly.express as px
 
-# Dashboard settings and security (Hiding the toolbar)
+# Dashboard settings - Sidebar එක සැමවිටම විවෘතව තැබීමට (Expanded)
 st.set_page_config(
     page_title="Lorry Logistics Dashboard", 
     layout="wide",
-    initial_sidebar_state="collapsed",
-    menu_items=None # මෙය මගින් අමතර menu බොත්තම් සඟවයි
+    initial_sidebar_state="expanded",
+    menu_items=None
 )
 
-# Toolbar එක සැඟවීමට CSS භාවිතා කිරීම
+# Toolbar එක සැඟවීමට CSS
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -43,7 +43,7 @@ data = load_data()
 st.title("🚚 Lorry Log Dashboard - DAF 7171")
 st.write(f"**වත්මන් ඉන්ධන මිල / Current Fuel Price:** Rs. {LIVE_FUEL_PRICE:.2f}")
 
-# --- Sidebar Input ---
+# --- Sidebar Input (දැන් මෙය විවෘතව පවතිනු ඇත) ---
 with st.sidebar.form("input_form"):
     st.header("නව දත්ත ඇතුළත් කරන්න (Add Data)")
     new_date = st.date_input("දිනය (Date)", datetime.date.today())
@@ -80,7 +80,6 @@ if not data.empty:
         c2.metric("සතිපතා වියදම (Weekly Cost)", f"Rs. {last_7['Total_Fuel_Cost'].sum():,.2f}")
         c3.metric("ට්‍රිප් ගණන (Trips)", len(last_7))
         
-        # Pie Chart for Weekly
         fig_week = px.pie(values=[last_7['Job_Fuel_Cost'].sum(), last_7['Office_Fuel_Cost'].sum()], 
                           names=['Job Cost', 'Office Commute'], title="සතිපතා වියදම් බෙදීම (Weekly Cost Breakdown)")
         st.plotly_chart(fig_week)
@@ -92,7 +91,6 @@ if not data.empty:
         c2.metric("මාසික Office Cost", f"Rs. {this_month['Office_Fuel_Cost'].sum():,.2f}")
         c3.metric("මුළු පිරිවැය (Total)", f"Rs. {this_month['Total_Fuel_Cost'].sum():,.2f}")
         
-        # Pie Chart for Monthly
         fig_month = px.pie(values=[this_month['Job_Fuel_Cost'].sum(), this_month['Office_Fuel_Cost'].sum()], 
                            names=['Net Job Cost', 'Office Commute'], title="මාසික වියදම් බෙදීම (Monthly Cost Breakdown)")
         st.plotly_chart(fig_month)
