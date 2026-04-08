@@ -2,25 +2,11 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import datetime
-import requests
 
 st.set_page_config(page_title="Lorry Logistics Dashboard", layout="wide")
 
-# --- සජීවීව ඉන්ධන මිල ලබා ගැනීම (Live Fuel Price) ---
-@st.cache_data(ttl=3600)
-def get_live_fuel_price():
-    try:
-        # Note: Replace with a working local API if available
-        return 310.0 
-    except:
-        return 310.0
-
-LIVE_FUEL_PRICE = get_live_fuel_price()
-
-st.title("🚚 Lorry Log Dashboard - DAF 7171")
-st.write(f"**වත්මන් සජීවී පෙට්‍රල් මිල / Current Live Petrol Price:** Rs. {LIVE_FUEL_PRICE:.2f}")
-
-# Parameters
+# Fuel Price & Settings
+LIVE_FUEL_PRICE = 310.0 
 KM_PER_LITER = 8.0   
 OFFICE_DISTANCE = 50 
 
@@ -28,25 +14,35 @@ OFFICE_DISTANCE = 50
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_data():
-    df = conn.read(worksheet="Sheet1")
-    df = df.dropna(how="all")
-    if not df.empty:
-        df['Date'] = pd.to_datetime(df['Date'])
-    return df
+    try:
+        df = conn.read(worksheet="Sheet1")
+        df = df.dropna(how="all") # හිස් පේළි ඉවත් කරයි
+        
+        if not df.empty and 'Date' in df.columns:
+            # දින ආකෘතිය නිවැරදිව පරිවර්තනය කරයි, වැරදි දත්ත ඇත්නම් ඒවා මඟහරියි
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            df = df.dropna(subset=['Date']) # දිනය වැරදි පේළි ඉවත් කරයි
+        return df
+    except Exception as e:
+        st.error(f"දත්ත කියවීමේදී ගැටලුවක් පවතී: {e}")
+        return pd.DataFrame()
 
 data = load_data()
 
-# --- Data Input Sidebar ---
+st.title("🚚 Lorry Log Dashboard - DAF 7171")
+st.write(f"**වත්මන් ඉන්ධන මිල / Current Fuel Price:** Rs. {LIVE_FUEL_PRICE:.2f}")
+
+# --- දත්ත ඇතුළත් කිරීමේ Sidebar ---
 with st.sidebar.form("input_form"):
-    st.header("නව දත්ත ඇතුළත් කරන්න (Add New Data)")
+    st.header("නව දත්ත ඇතුළත් කරන්න (Add Data)")
     new_date = st.date_input("දිනය (Date)", datetime.date.today())
-    start_km = st.number_input("ආරම්භක මීටරය (Start KM Reading)", min_value=0)
-    end_km = st.number_input("අවසාන මීටරය (End KM Reading)", min_value=0)
-    fuel_type = st.selectbox("ඉන්ධන වර්ගය (Fuel Type)", ["Petrol 92", "Petrol 95"])
-    fuel_liters = st.number_input("පිරවූ ලීටර් ගණන (Fuel Liters Filled)", min_value=0.0)
-    trip_details = st.text_input("ට්‍රිප් එකේ විස්තර (Trip Details)")
+    start_km = st.number_input("ආරම්භක මීටරය (Start KM)", min_value=0)
+    end_km = st.number_input("අවසාන මීටරය (End KM)", min_value=0)
+    fuel_type = st.selectbox("ඉන්ධන වර්ගය", ["Petrol 92", "Petrol 95"])
+    fuel_liters = st.number_input("පිරවූ ලීටර් ගණන", min_value=0.0)
+    trip_details = st.text_input("ට්‍රිප් එකේ විස්තර")
     
-    submitted = st.form_submit_button("දත්ත සුරකින්න (Save Data)")
+    submitted = st.form_submit_button("දත්ත සුරකින්න (Save)")
 
 if submitted:
     diff = end_km - start_km
@@ -65,49 +61,33 @@ if submitted:
     
     updated_df = pd.concat([data, new_row], ignore_index=True)
     conn.update(worksheet="Sheet1", data=updated_df)
-    st.sidebar.success("දත්ත සාර්ථකව ඇතුළත් කළා! (Data Saved Successfully!)")
+    st.sidebar.success("දත්ත සුරැකුණා! (Saved!)")
     st.rerun()
 
-# --- Dashboard Calculations ---
+# --- Dashboard Display ---
 if not data.empty:
     data['Total_Fuel_Cost'] = data['Difference'] / KM_PER_LITER * LIVE_FUEL_PRICE
     data['Office_Fuel_Cost'] = OFFICE_DISTANCE / KM_PER_LITER * LIVE_FUEL_PRICE
     data['Job_Fuel_Cost'] = data['Per_Job_KM'] / KM_PER_LITER * LIVE_FUEL_PRICE
 
-# --- Dashboard Display ---
-st.header("📊 ඉන්ධන සහ ට්‍රිප් විශ්ලේෂණය (Fuel & Trip Analytics)")
+    st.header("📊 විශ්ලේෂණය (Analytics)")
+    tab1, tab2, tab3 = st.tabs(["සතිපතා", "මාසික", "සම්පූර්ණ දත්ත"])
 
-tab1, tab2, tab3 = st.tabs([
-    "සතිපතා වාර්තාව (Weekly Report)", 
-    "මාසික වාර්තාව (Monthly Report)", 
-    "සම්පූර්ණ දත්ත (Full Data Log)"
-])
-
-if not data.empty:
     with tab1:
-        st.subheader("පසුගිය දින 7 (Last 7 Days)")
         last_week = data[data['Date'] > (pd.Timestamp.now() - pd.Timedelta(days=7))]
         col1, col2, col3 = st.columns(3)
-        col1.metric("මුළු දුර (Total Distance)", f"{last_week['Difference'].sum():.1f} KM")
-        col2.metric("මුළු ඉන්ධන වියදම (Total Fuel Cost)", f"Rs. {last_week['Total_Fuel_Cost'].sum():,.2f}")
-        col3.metric("ට්‍රිප් ගණන (No. of Trips)", len(last_week))
+        col1.metric("මුළු දුර", f"{last_week['Difference'].sum():.1f} KM")
+        col2.metric("වියදම", f"Rs. {last_week['Total_Fuel_Cost'].sum():,.2f}")
+        col3.metric("ට්‍රිප් ගණන", len(last_week))
 
     with tab2:
-        st.subheader("මේ මාසයේ වාර්තාව (Monthly Summary)")
         this_month = data[data['Date'].dt.month == datetime.date.today().month]
         col1, col2, col3 = st.columns(3)
-        col1.metric("ට්‍රිප් වල වියදම (Net Job Cost)", f"Rs. {this_month['Job_Fuel_Cost'].sum():,.2f}")
-        col2.metric("කාර්යාල ගමන් වියදම (Office Commute)", f"Rs. {this_month['Office_Fuel_Cost'].sum():,.2f}")
-        col3.metric("මුළු පිරිවැය (Total Monthly Cost)", f"Rs. {this_month['Total_Fuel_Cost'].sum():,.2f}")
+        col1.metric("Job Cost", f"Rs. {this_month['Job_Fuel_Cost'].sum():,.2f}")
+        col2.metric("Office Cost", f"Rs. {this_month['Office_Fuel_Cost'].sum():,.2f}")
+        col3.metric("මුළු වියදම", f"Rs. {this_month['Total_Fuel_Cost'].sum():,.2f}")
 
     with tab3:
         st.dataframe(data)
-        csv = data.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="වාර්තාව බාගත කරගන්න (Download Summary Report)",
-            data=csv,
-            file_name=f"Lorry_Report_{datetime.date.today()}.csv",
-            mime="text/csv",
-        )
 else:
-    st.warning("තවමත් දත්ත ඇතුළත් කර නොමැත. (No data available yet.)")
+    st.info("පෙන්වීමට දත්ත කිසිවක් නොමැත. (No data to display.)")
