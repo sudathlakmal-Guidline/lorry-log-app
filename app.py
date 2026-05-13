@@ -12,7 +12,7 @@ st.set_page_config(
     menu_items=None
 )
 
-# Toolbar එක සැඟවීමට CSS
+# Toolbar එක සැඟවීමට සහ Notification එක පෙන්වීමට CSS
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden;}
@@ -22,6 +22,9 @@ hide_st_style = """
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
+
+# --- Add to Home Screen Instruction ---
+st.info("💡 **Tip:** To access this app easily, tap the **'three dots' (⋮)** or **'Share'** button on your browser and select **'Add to Home Screen'**.")
 
 # පරාමිතීන්
 LIVE_FUEL_PRICE = 310.0 
