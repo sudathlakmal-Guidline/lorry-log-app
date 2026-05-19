@@ -29,7 +29,7 @@ st.info("💡 **Tip:** To access this app easily, tap the **'three dots' (⋮)**
 # පරාමිතීන්
 LIVE_FUEL_PRICE = 310.0 
 KM_PER_LITER = 8.0   
-OFFICE_DISTANCE = 50 
+OFFICE_DISTANCE = 50  
 
 # Google Sheets Connection (TTL=0 මගින් Cache එක නැති කරයි)
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -103,7 +103,7 @@ if not data.empty:
         last_7 = data[data['Date'] >= (pd.Timestamp.now() - pd.Timedelta(days=7))]
         if not last_7.empty:
             c1, c2, c3 = st.columns(3)
-            c1.metric("සතිපතා දුර (Weekly KM)", f"{last_7['Difference'].sum():.1f} KM")
+            c1.metric("සතිපතා 😊ුර (Weekly KM)", f"{last_7['Difference'].sum():.1f} KM")
             c2.metric("සතිපතා වියදම (Weekly Cost)", f"Rs. {last_7['Total_Fuel_Cost'].sum():,.2f}")
             c3.metric("ට්‍රිප් ගණන (Trips)", len(last_7))
             
@@ -133,3 +133,9 @@ if not data.empty:
         st.dataframe(data.sort_values(by="Date", ascending=False), use_container_width=True)
 else:
     st.warning("පද්ධතියේ තවමත් දත්ත කිසිවක් නොමැත. කරුණාකර අලුත් දත්ත පේළියක් ඇතුළත් කරන්න.")
+
+# --- 24x7 LIVE KEEP-ALIVE ENDPOINT ---
+# UptimeRobot මඟින් සර්වර් එක දිගටම අවදිව තබා ගැනීමට යොදන කොටස
+if st.query_params.get("ping") == "true":
+    st.write("Keep-Alive Active")
+    st.stop()
