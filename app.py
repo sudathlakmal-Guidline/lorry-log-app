@@ -12,6 +12,11 @@ st.set_page_config(
     menu_items=None
 )
 
+# 🔄 24x7 LIVE KEEP-ALIVE ENDPOINT (UptimeRobot සංඥා මුලින්ම හඳුනාගෙන ඇප් එක අවදිව තබයි)
+if st.query_params.get("ping") == "true":
+    st.write("Keep-Alive Active")
+    st.stop()
+
 # Toolbar එක සැඟවීමට සහ Notification එක පෙන්වීමට CSS
 hide_st_style = """
             <style>
@@ -54,7 +59,7 @@ with st.sidebar.form("input_form", clear_on_submit=True):
     st.header("නව දත්ත ඇතුළත් කරන්න (Add Data)")
     new_date = st.date_input("දිනය (Date)", datetime.date.today())
     start_km = st.number_input("ආරම්භක මීටරය (Start KM)", min_value=0)
-    end_km = st.number_input("अවසාන මීටරය (End KM)", min_value=0)
+    end_km = st.number_input("අවසාන මීටරය (End KM)", min_value=0)
     fuel_type = st.selectbox("ඉන්ධන වර්ගය (Fuel Type)", ["Petrol 92", "Petrol 95"])
     fuel_liters = st.number_input("පිරවූ ලීටර් ගණන (Liters Filled)", min_value=0.0)
     trip_details = st.text_input("ට්‍රිප් එකේ විස්තර (Trip Details)")
@@ -103,7 +108,7 @@ if not data.empty:
         last_7 = data[data['Date'] >= (pd.Timestamp.now() - pd.Timedelta(days=7))]
         if not last_7.empty:
             c1, c2, c3 = st.columns(3)
-            c1.metric("සතිපතා දුර (Weekly KM)", f"{last_7['Difference'].sum():.1f} KM")
+            c1.metric("සතිපතා... දුර (Weekly KM)", f"{last_7['Difference'].sum():.1f} KM")
             c2.metric("සතිපතා වියදම (Weekly Cost)", f"Rs. {last_7['Total_Fuel_Cost'].sum():,.2f}")
             c3.metric("ට්‍රිප් ගණන (Trips)", len(last_7))
             
@@ -133,9 +138,3 @@ if not data.empty:
         st.dataframe(data.sort_values(by="Date", ascending=False), use_container_width=True)
 else:
     st.warning("පද්ධතියේ තවමත් දත්ත කිසිවක් නොමැත. කරුණාකර අලුත් දත්ත පේළියක් ඇතුළත් කරන්න.")
-
-# --- 24x7 LIVE KEEP-ALIVE ENDPOINT ---
-# UptimeRobot මඟින් සර්වර් එක දිගටම අවදිව තබා ගැනීමට යොදන කොටස
-if st.query_params.get("ping") == "true":
-    st.write("Keep-Alive Active")
-    st.stop()
